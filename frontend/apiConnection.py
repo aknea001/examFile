@@ -14,7 +14,7 @@ class APIc():
         # self.token = res.json()["token"]
         print(username)
         print(passwd)
-        return False
+        return True
 
     def register(self, username: str, passwd: str) -> bool:
         # post request, doesnt necessarily return anything
@@ -35,11 +35,16 @@ class APIc():
         # if download == here:
         #       func.parameter.append(newLocation: str)
         pass
+    
+    def delete(self, fileID: int):
+        # delete request, doesnt necessarily return anything
+        # 204 = success
+        pass
 
-    def tableData(self):
+    def tableData(self) -> list:
         # get request, returns list of files user has uploaded
         # f eks: [{"fileName": "contract", "fileExtension": "mp3"}, {"fileName": "essay", "fileExtension": "jpeg"}, {"fileName": "ytVid", "fileExtension": "pdf"}]
-        pass
+        return [{"fileName": "contract", "fileExtension": "mp3"}, {"fileName": "essay", "fileExtension": "jpeg"}, {"fileName": "ytVid", "fileExtension": "pdf"}]
     
 if __name__ == "__main__":
     api = APIc("http://localhost:8000")

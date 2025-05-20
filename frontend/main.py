@@ -55,6 +55,10 @@ class Frontend(tk.Tk):
         self.loginBtn.grid(row=2, column=1)
         self.registerBtn.grid(row=4, column=1, pady=20)
 
+    def logout(self):
+        self.api.token = None
+        self.switchPage("loginPage")
+
     def registerPage(self):
         usernameVar = tk.StringVar()
         passwdVar = tk.StringVar()
@@ -80,8 +84,10 @@ class Frontend(tk.Tk):
 
         self.usernameLabel = tk.Label(self, text="Username")
         self.usernameEntry = tk.Entry(self, textvariable=usernameVar)
+
         self.passwdLabel = tk.Label(self, text="Password")
         self.passwdEntry = tk.Entry(self, textvariable=passwdVar, show="*")
+
         self.confirmPasswdLabel = tk.Label(self, text="Confirm Password")
         self.confirmPasswdEntry = tk.Entry(self, textvariable=confirmPasswdVar, show="*")
 
@@ -101,7 +107,33 @@ class Frontend(tk.Tk):
         self.loginBtn.grid(row=5, column=1, pady=20)
 
     def homePage(self, entries: list):
-        pass
+        self.menuBar = tk.Menu(self)
+        self.config(menu=self.menuBar)
+
+        self.menuBar.add_command(label="Logout", command=self.logout)
+
+        if not entries:
+            tk.Label(self, text="Click Upload to upload a file").pack()
+        else:
+            count = 0
+            for i in entries:
+                self.addRow(f"{i['fileName']}.{i['fileExtension']}", count)
+                count += 1
+
+    def addRow(self, fileName: str, fileID: int):
+        row = tk.Frame(self)
+
+        row.columnconfigure(0, weight=1)
+
+        label = tk.Label(row, text=fileName)
+        btn = tk.Button(row, text="Download", width=12, command=lambda: self.api.download(fileID))
+        deleteBtn = tk.Button(row, text="Delete", width=12, command=lambda: self.api.delete(fileID))
+        
+        label.grid(row=0, column=0, sticky="we")
+        btn.grid(row=0, column=1, padx=(0, 2))
+        deleteBtn.grid(row=0, column=2)
+
+        row.pack(fill="x", side="top", pady=(3, 0), padx=(0, 2))
 
 def main():
     apiBaseUrl = "chrome-extension://http://https:/api.api/api?api=api"
