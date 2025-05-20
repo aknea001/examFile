@@ -9,7 +9,7 @@ class Frontend(tk.Tk):
 
         self.api = APIc(apiBaseUrl)
 
-        self.switchPage("registerPage")
+        self.switchPage("loginPage")
     
     def switchPage(self, pageName: str, *args):
         for widget in self.winfo_children():
@@ -45,12 +45,15 @@ class Frontend(tk.Tk):
         self.errorLabel = tk.Label(self, textvariable=errorVar)
         self.loginBtn = tk.Button(self, text="Login", command=login)
 
+        self.registerBtn = tk.Button(self, text="Create account", command=lambda: self.switchPage("registerPage"))
+
         self.usernameLabel.grid(row=0, column=0)
         self.usernameEntry.grid(row=0, column=1)
         self.passwdLabel.grid(row=1, column=0)
         self.passwdEntry.grid(row=1, column=1)
         self.errorLabel.grid(row=2, column=1)
         self.loginBtn.grid(row=2, column=1)
+        self.registerBtn.grid(row=4, column=1, pady=20)
 
     def registerPage(self):
         usernameVar = tk.StringVar()
@@ -85,6 +88,8 @@ class Frontend(tk.Tk):
         self.errorLabel = tk.Label(self, textvariable=errorVar)
         self.registerBtn = tk.Button(self, text="Register", command=register)
 
+        self.loginBtn = tk.Button(self, text="Already have an account", command=lambda: self.switchPage("loginPage"))
+
         self.usernameLabel.grid(row=0, column=0)
         self.usernameEntry.grid(row=0, column=1)
         self.passwdLabel.grid(row=1, column=0)
@@ -93,6 +98,7 @@ class Frontend(tk.Tk):
         self.confirmPasswdEntry.grid(row=2, column=1)
         self.errorLabel.grid(row=3, column=1)
         self.registerBtn.grid(row=3, column=1)
+        self.loginBtn.grid(row=5, column=1, pady=20)
 
     def homePage(self, entries: list):
         pass
