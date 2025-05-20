@@ -9,15 +9,19 @@ class APIc():
         self.session = requests.Session()
         self.session.headers.update(self.headers)
     
-    def login(self, username: str, passwd: str):
+    def login(self, username: str, passwd: str) -> bool:
         # post request, returns jwt token
         # self.token = res.json()["token"]
-        pass
+        print(username)
+        print(passwd)
+        return False
 
-    def register(self, username: str, passwd: str):
+    def register(self, username: str, passwd: str) -> bool:
         # post request, doesnt necessarily return anything
         # 201 = success
-        pass
+        print(username)
+        print(passwd)
+        return False
 
     def upload(self, b64file: str, fileName: str):
         # post request, doesnt necessarily return anything
