@@ -3,8 +3,9 @@ import requests
 class APIc():
     def __init__(self, url: str):
         self.baseUrl = url
+        self.passwd = None
         self.token = None
-        self.headers = {"Authorization": self.token}
+        self.headers = {"Authorization": f"Bearer {self.token}"}
 
         self.session = requests.Session()
         self.session.headers.update(self.headers)
@@ -14,26 +15,34 @@ class APIc():
             res = s.post(f"{self.baseUrl}/login", json={"username": username, "passwd": passwd})
 
         if res.status_code != 200:
-            return {"status": False, "code": res.status_code, "msg": res.json()["msg"]}
+            return {"success": False, "code": res.status_code, "msg": res.json()["msg"]}
         
         self.token = res.json()["token"]
-        return {"status": True}
+        self.passwd = passwd
+        self.headers["Authorization"] = f"Bearer {self.token}"
+        self.session.headers.update(self.headers)
+        return {"success": True}
 
     def register(self, username: str, passwd: str) -> dict:
-        # post request, doesnt necessarily return anything
-        # 201 = success
         with self.session as s:
             res = s.post(f"{self.baseUrl}/register", json={"username": username, "passwd": passwd})
         
         if res.status_code != 201:
-            return {"status": False, "code": res.status_code, "msg": res.json()["msg"]}
+            return {"success": False, "code": res.status_code, "msg": res.json()["msg"]}
         
-        return {"status": True}
+        return {"success": True}
 
-    def upload(self, b64file: str, fileName: str):
-        # post request, doesnt necessarily return anything
-        # 201 = success
-        pass
+    def upload(self, b64file: str, fileName: str) -> dict:
+        with self.session as s:
+            res = s.post(f"{self.baseUrl}/upload", json={"fileB64bytes": b64file, "fileName": fileName, "passwd": self.passwd})
+            print(res.request.headers)
+            print(res.headers)
+        
+        if res.status_code != 201:
+            print(res.json())
+            return {"success": False, "code": res.status_code, "msg": res.json()["msg"]}
+        
+        return {"success": True}
 
     def download(self, fileID: int):
         # get request, returns b64file

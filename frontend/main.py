@@ -1,4 +1,6 @@
 import tkinter as tk
+from tkinter import filedialog
+import base64
 from apiConnection import APIc
 
 class Frontend(tk.Tk):
@@ -29,7 +31,7 @@ class Frontend(tk.Tk):
 
             checkCreds = self.api.login(username, passwd)
 
-            if not checkCreds["status"]:
+            if not checkCreds["success"]:
                 self.loginBtn.grid(row=3)
                 errorVar.set(f"{checkCreds['code']}: {checkCreds['msg']}")
                 return
@@ -59,6 +61,7 @@ class Frontend(tk.Tk):
 
     def logout(self):
         self.api.token = None
+        self.api.passwd = None
         self.switchPage("loginPage")
 
     def registerPage(self):
@@ -78,7 +81,7 @@ class Frontend(tk.Tk):
                 return
 
             tryRegister = self.api.register(username, passwd)
-            if not tryRegister["status"]:
+            if not tryRegister["success"]:
                 self.registerBtn.grid(row=4)
                 errorVar.set(f"{tryRegister['code']: tryRegister['msg']} \nTry again later..")
                 return
@@ -122,6 +125,9 @@ class Frontend(tk.Tk):
             for i in entries:
                 self.addRow(f"{i['fileName']}.{i['fileExtension']}", count)
                 count += 1
+        
+        self.uploadBtn = tk.Button(self, text="Upload", command=self.upload)
+        self.uploadBtn.pack(side="bottom")
 
     def addRow(self, fileName: str, fileID: int):
         row = tk.Frame(self)
@@ -137,6 +143,24 @@ class Frontend(tk.Tk):
         deleteBtn.grid(row=0, column=2)
 
         row.pack(fill="x", side="top", pady=(3, 0), padx=(0, 2))
+
+    def getFile(self) -> str | None:
+        filePath = filedialog.askopenfilename(title="Select file to upload")
+        if filePath:
+            return filePath
+
+    def upload(self):
+        filePath = self.getFile()
+
+        if not filePath:
+            return
+        
+        with open(filePath, "rb") as f:
+            text = f.read()
+
+        b64file = base64.b64encode(text).decode()
+        
+        self.api.upload(b64file, filePath.split("/")[-1])
 
 def main():
     #apiBaseUrl = "chrome-extension://http://https:/api.api/api?api=api"
