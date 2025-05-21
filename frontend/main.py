@@ -27,9 +27,11 @@ class Frontend(tk.Tk):
             username = usernameVar.get()
             passwd = passwdVar.get()
 
-            if not self.api.login(username, passwd):
+            checkCreds = self.api.login(username, passwd)
+
+            if not checkCreds["status"]:
                 self.loginBtn.grid(row=3)
-                errorVar.set("Wrong username or password..")
+                errorVar.set(f"{checkCreds['code']}: {checkCreds['msg']}")
                 return
             
             entries = self.api.tableData()
@@ -75,9 +77,10 @@ class Frontend(tk.Tk):
                 errorVar.set("Passwords not matching..")
                 return
 
-            if not self.api.register(username, passwd):
+            tryRegister = self.api.register(username, passwd)
+            if not tryRegister["status"]:
                 self.registerBtn.grid(row=4)
-                errorVar.set("Error registering user \nTry again later..")
+                errorVar.set(f"{tryRegister['code']: tryRegister['msg']} \nTry again later..")
                 return
 
             self.switchPage("loginPage")
@@ -136,7 +139,8 @@ class Frontend(tk.Tk):
         row.pack(fill="x", side="top", pady=(3, 0), padx=(0, 2))
 
 def main():
-    apiBaseUrl = "chrome-extension://http://https:/api.api/api?api=api"
+    #apiBaseUrl = "chrome-extension://http://https:/api.api/api?api=api"
+    apiBaseUrl = "http://100.94.183.127:8000"
 
     app = Frontend(apiBaseUrl)
     app.mainloop()
