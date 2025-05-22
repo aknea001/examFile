@@ -135,7 +135,7 @@ class Frontend(tk.Tk):
         row.columnconfigure(0, weight=1)
 
         label = tk.Label(row, text=fileName)
-        btn = tk.Button(row, text="Download", width=12, command=lambda: self.download(1))
+        btn = tk.Button(row, text="Download", width=12, command=lambda: self.download(fileID))
         deleteBtn = tk.Button(row, text="Delete", width=12, command=lambda: self.api.delete(fileID))
         
         label.grid(row=0, column=0, sticky="we")
