@@ -135,7 +135,7 @@ class Frontend(tk.Tk):
         row.columnconfigure(0, weight=1)
 
         label = tk.Label(row, text=fileName)
-        btn = tk.Button(row, text="Download", width=12, command=lambda: self.api.download(fileID))
+        btn = tk.Button(row, text="Download", width=12, command=lambda: self.download(1))
         deleteBtn = tk.Button(row, text="Delete", width=12, command=lambda: self.api.delete(fileID))
         
         label.grid(row=0, column=0, sticky="we")
@@ -146,8 +146,17 @@ class Frontend(tk.Tk):
 
     def getFile(self) -> str | None:
         filePath = filedialog.askopenfilename(title="Select file to upload")
-        if filePath:
-            return filePath
+        if not filePath:
+            return None
+        
+        return filePath
+    
+    def getFoler(self) -> str | None:
+        folderPath = filedialog.askdirectory(title="Folder to download file")
+        if not folderPath:
+            return None
+        
+        return folderPath
 
     def upload(self):
         filePath = self.getFile()
@@ -161,6 +170,21 @@ class Frontend(tk.Tk):
         b64file = base64.b64encode(text).decode()
         
         self.api.upload(b64file, filePath.split("/")[-1])
+    
+    def download(self, fileID: int):
+        folderPath = self.getFoler()
+
+        if not folderPath:
+            return
+        
+        result = self.api.download(fileID)
+
+        if not result["success"]:
+            return #add error handling later
+        
+        data = result["data"]
+        with open(f"{folderPath}/{data['name']}.{data['extension']}", "wb") as f:
+            f.write(base64.b64decode(data["data"]))
 
 def main():
     #apiBaseUrl = "chrome-extension://http://https:/api.api/api?api=api"

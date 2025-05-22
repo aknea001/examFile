@@ -35,8 +35,6 @@ class APIc():
     def upload(self, b64file: str, fileName: str) -> dict:
         with self.session as s:
             res = s.post(f"{self.baseUrl}/upload", json={"fileB64bytes": b64file, "fileName": fileName, "passwd": self.passwd})
-            print(res.request.headers)
-            print(res.headers)
         
         if res.status_code != 201:
             print(res.json())
@@ -44,13 +42,17 @@ class APIc():
         
         return {"success": True}
 
-    def download(self, fileID: int):
+    def download(self, fileID: int) -> dict:
         # get request, returns b64file
         # idk if ill "download" here or in main frontend
-
-        # if download == here:
-        #       func.parameter.append(newLocation: str)
-        pass
+        with self.session as s:
+            res = s.post(f"{self.baseUrl}/download", json={"dekDerivation": {"passwd": self.passwd}, "fileID": {"id": fileID}})
+        
+        if res.status_code != 200:
+            return {"success": False, "code": res.status_code, "msg": res.json()["msg"]}
+        
+        #return {"success": True, "data": res.json()["data"], "name": res.json()["name"], "extension": res.json()["extension"]}
+        return {"success": True, "data": res.json()}
     
     def delete(self, fileID: int):
         # delete request, doesnt necessarily return anything
