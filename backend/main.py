@@ -248,7 +248,7 @@ async def delete(request: Request, response: Response, token: Annotated[str, Dep
     userID = identity["id"]
 
     try:
-        x = db.execute("SELECT id FROM files WHERE userID = %s LIMIT %s,1", userID, fileID)
+        x = db.execute("SELECT id FROM files WHERE userID = %s LIMIT %s,1", userID, fileID)[0]
         db.execute("DELETE FROM files WHERE userID = %s AND id = %s", userID, x)
     except ConnectionError as e:
         response.status_code =  500
