@@ -78,6 +78,12 @@ class APIc():
             return {"success": False, "code": res.status_code, "msg": res.json()["msg"]}
         
         return res.json()
+    
+    def testSyncing(self):
+        with self.session as s:
+            res = s.get(f"{self.baseUrl}/testSyncing")
+        
+        print(res.json())
 
 if __name__ == "__main__":
     api = APIc("http://localhost:8000")

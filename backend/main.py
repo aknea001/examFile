@@ -275,3 +275,7 @@ async def tableInfo(request: Request, response: Response, token: Annotated[str, 
         parsedData.append(dic)
 
     return parsedData
+
+@app.get("/testSyncing")
+async def testSyncing():
+    return "Heyy"

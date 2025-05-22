@@ -1,10 +1,14 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import base64
-from os import getcwd, remove
+from os import getcwd, remove, listdir, kill
 from os.path import isfile, join
+from signal import SIGTERM
+import subprocess
 import json
 from apiConnection import APIc
+from sync import sync
+import psutil
 
 class Frontend(tk.Tk):
     def __init__(self, apiBaseUrl):
@@ -14,20 +18,42 @@ class Frontend(tk.Tk):
 
         self.api = APIc(apiBaseUrl)
 
-        self.loginFile = join(getcwd(), "login.json")
-        if isfile(self.loginFile):
-            with open(self.loginFile, "r") as f:
+        self.infoFile = join(getcwd(), "info.json")
+        if isfile(self.infoFile):
+            with open(self.infoFile, "r") as f:
                 data = json.load(f)
 
             username = data["username"]
             passwd = data["passwd"]
+            self.syncing = data["syncing"]
+            self.syncingFolder = data["syncingFolder"]
             checkCreds = self.api.login(username, passwd)
 
             if not checkCreds["success"]:
-                remove(self.loginFile)
+                remove(self.infoFile)
                 self.switchPage("loginPage")
                 return
             
+            if self.syncing == "t":
+                try:
+                    process = psutil.Process(int(data["syncingpid"]))
+
+                    if process.name() == "python.exe":
+                        running = True
+                    else:
+                        running = False
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    running = False
+                
+                if not running:
+                    pid = self.startSyncing()
+
+                    data["syncingpid"] = pid
+
+                    with open(self.infoFile, "w") as f:
+                        newData = json.dumps(data, indent=4)
+                        f.write(newData)
+
             entries = self.api.tableData()
             self.switchPage("homePage", entries)
             return
@@ -57,12 +83,16 @@ class Frontend(tk.Tk):
                 errorVar.set(f"{checkCreds['code']}: {checkCreds['msg']}")
                 return
             
-            with open(self.loginFile, "w") as f:
+            with open(self.infoFile, "w") as f:
                 data = json.dumps({
                                     "username": username, 
                                     "passwd": passwd,
-                                    "token": self.api.token
+                                    "token": self.api.token,
+                                    "syncing": "f",
+                                    "syncingFolder": ""
                                     }, indent=4)
+                self.syncing = "f"
+                self.syncingFolder = ""
                 f.write(data)
             
             entries = self.api.tableData()
@@ -92,8 +122,10 @@ class Frontend(tk.Tk):
         self.api.token = None
         self.api.passwd = None
 
-        if isfile(self.loginFile):
-            remove(self.loginFile)
+        if isfile(self.infoFile):
+            remove(self.infoFile)
+
+        self.stopSyncing([])
 
         self.switchPage("loginPage")
 
@@ -151,12 +183,23 @@ class Frontend(tk.Tk):
 
         self.menuBar.add_command(label="Logout", command=self.logout)
 
+        if self.syncing == "f":
+            self.menuBar.add_command(label="Enable syncing", command=lambda: self.enableSync(entries))
+        else:
+            self.syncingMenu = tk.Menu(self.menuBar, tearoff=0)
+            self.menuBar.add_cascade(label="Syncing", menu=self.syncingMenu)
+
+            self.syncingMenu.add_command(label="Stop syncing", command=lambda: self.stopSyncing(entries))
+            self.syncingMenu.add_command(label="Manual sync", command=self.manualSync)
+            self.syncingMenu.add_command(label="Test3")
+
         if not entries:
             tk.Label(self, text="Click Upload to upload a file").pack()
         else:
             count = 0
             for i in entries:
-                self.addRow(f"{i['fileName']}.{i['fileExtension']}", count)
+                fullName = f"{i['fileName']}.{i['fileExtension']}"
+                self.addRow(fullName, count)
                 count += 1
         
         self.uploadBtn = tk.Button(self, text="Upload", command=self.upload)
@@ -179,22 +222,22 @@ class Frontend(tk.Tk):
 
         self.latestFileID = fileID
 
-    def getFile(self) -> str | None:
-        filePath = filedialog.askopenfilename(title="Select file to upload")
+    def getFile(self, title: str) -> str | None:
+        filePath = filedialog.askopenfilename(title=title)
         if not filePath:
             return None
         
         return filePath
     
-    def getFoler(self) -> str | None:
-        folderPath = filedialog.askdirectory(title="Folder to download file")
+    def getFolder(self, title: str) -> str | None:
+        folderPath = filedialog.askdirectory(title=title)
         if not folderPath:
             return None
         
         return folderPath
 
     def upload(self):
-        filePath = self.getFile()
+        filePath = self.getFile("Select file to upload")
 
         if not filePath:
             return
@@ -211,7 +254,7 @@ class Frontend(tk.Tk):
             self.addRow(filename, self.latestFileID + 1)
     
     def download(self, fileID: int):
-        folderPath = self.getFoler()
+        folderPath = self.getFolder("Select folder to download file in")
 
         if not folderPath:
             return
@@ -239,6 +282,82 @@ class Frontend(tk.Tk):
             return # add error handling later
         
         row.destroy()
+
+    def enableSync(self, entries: list):
+        folder = self.getFolder("Select folder to sync against")
+        
+        if not folder:
+            return
+        
+        self.syncing = "t"
+        self.syncingFolder = folder
+
+        currentFiles = []
+
+        for f in listdir(folder):
+            if isfile(join(folder, f)):
+                currentFiles.append(f)
+
+        filesToUpload = []
+        filesToDownload = []
+
+        for f in currentFiles:
+            if f not in entries:
+                filesToUpload.append(f)
+
+        for f in entries:
+            if f not in currentFiles:
+                filesToDownload.append(f)
+
+        print(filesToUpload)
+        print(filesToDownload)
+
+        pid = self.startSyncing()
+
+        with open(self.infoFile, "r") as f:
+            data = json.load(f)
+        
+        data["syncing"] = self.syncing
+        data["syncingFolder"] = self.syncingFolder
+        data["syncingpid"] = pid
+
+        with open(self.infoFile, "w") as f:
+            newData = json.dumps(data, indent=4)
+            f.write(newData)
+
+        self.syncing = "t"
+
+        self.switchPage("homePage", entries)
+
+    def startSyncing(self) -> str:
+        process = subprocess.Popen(["python", join(getcwd(), "sync.py")])
+        pid = str(process.pid)
+
+        return pid
+
+    def stopSyncing(self, entries: list):
+        with open(self.infoFile, "r") as f:
+            data = json.load(f)
+        
+        pid = data["syncingpid"]
+        kill(int(pid), SIGTERM)
+
+        data["syncing"] = "f"
+        data["syncingFolder"] = ""
+        data["syncingpid"] = ""
+
+        with open(self.infoFile, "w") as f:
+            newData = json.dumps(data, indent=4)
+            f.write(newData)
+        
+        self.syncing = "f"
+        
+        self.switchPage("homePage", entries)
+    
+    def manualSync(self):
+        newEntries = sync(self.api)
+
+        self.switchPage("homePage", newEntries)
 
 def main():
     #apiBaseUrl = "chrome-extension://http://https:/api.api/api?api=api"
