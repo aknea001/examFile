@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import base64
+from os import getcwd, remove
+from os.path import isfile, join
+import json
 from apiConnection import APIc
 
 class Frontend(tk.Tk):
@@ -10,6 +13,24 @@ class Frontend(tk.Tk):
         self.geometry("640x360")
 
         self.api = APIc(apiBaseUrl)
+
+        self.loginFile = join(getcwd(), "login.json")
+        if isfile(self.loginFile):
+            with open(self.loginFile, "r") as f:
+                data = json.load(f)
+
+            username = data["username"]
+            passwd = data["passwd"]
+            checkCreds = self.api.login(username, passwd)
+
+            if not checkCreds["success"]:
+                remove(self.loginFile)
+                self.switchPage("loginPage")
+                return
+            
+            entries = self.api.tableData()
+            self.switchPage("homePage", entries)
+            return
 
         self.switchPage("loginPage")
     
@@ -35,6 +56,14 @@ class Frontend(tk.Tk):
                 self.loginBtn.grid(row=3)
                 errorVar.set(f"{checkCreds['code']}: {checkCreds['msg']}")
                 return
+            
+            with open(self.loginFile, "w") as f:
+                data = json.dumps({
+                                    "username": username, 
+                                    "passwd": passwd,
+                                    "token": self.api.token
+                                    }, indent=4)
+                f.write(data)
             
             entries = self.api.tableData()
 
@@ -62,6 +91,10 @@ class Frontend(tk.Tk):
     def logout(self):
         self.api.token = None
         self.api.passwd = None
+
+        if isfile(self.loginFile):
+            remove(self.loginFile)
+
         self.switchPage("loginPage")
 
     def registerPage(self):
