@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Response, Depends
+from fastapi import FastAPI, Request, Response, Depends, Query, Body
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from typing import Annotated
@@ -31,6 +31,20 @@ def decodeJWT(token: str) -> dict:
     
     return {"success": True, "id": int(identity)}
 
+def getDEK(db, userID: int | str, passwd: bytes) -> bytes:
+    try:
+        data = db.execute("SELECT dek, salt, nonce, tag FROM users WHERE id = %s", userID)
+    except ConnectionError as e:
+        raise ConnectionError(e)
+
+    b64encryptedDek, b64dekSalt, b64dekNonce, b64dekTag = data
+
+    encryptedDek, dekSalt, dekNonce, dekTag = [base64.b64decode(i) for i in (b64encryptedDek, b64dekSalt, b64dekNonce, b64dekTag)]
+
+    dek = decryptDEK(encryptedDek, passwd, dekSalt, dekNonce, dekTag)
+
+    return dek
+
 def decryptDEK(ciphertext: bytes, passwd: bytes, salt: bytes, nonce: bytes, tag: bytes) -> bytes:
     kek = hh.getKEK(passwd, salt)
 
@@ -53,13 +67,24 @@ def compress(plaintext: bytes) -> dict:
     
     return {"data": compressed, "compressed": True}
 
+def decompress(compressed: bytes) -> bytes:
+    dctx = zstd.ZstdDecompressor()
+    decompressed = dctx.decompress(compressed)
+
+    return decompressed
+
 class Credentials(BaseModel):
     username: str
     passwd: str
 
 class File(BaseModel):
-    fileB64bytes: str
-    fileName: str
+    b64bytes: str
+    name: str
+
+class FileID(BaseModel):
+    id: int
+
+class DekDerivation(BaseModel):
     passwd: str
 
 @asynccontextmanager
@@ -77,7 +102,11 @@ oauth2Scheme = OAuth2PasswordBearer(tokenUrl="login")
 @app.post("/login", status_code=200)
 async def login(request: Request, response: Response, body: Credentials):
     db = request.app.state.db
-    data = db.execute("SELECT hash, id FROM users WHERE username = %s", body.username)
+    try:
+        data = db.execute("SELECT hash, id FROM users WHERE username = %s", body.username)
+    except ConnectionError as e:
+        response.status_code = 500
+        return {"msg": f"Database error: {e}"}
 
     if not data:
         response.status_code = 401
@@ -108,18 +137,18 @@ async def register(request: Request, response: Response, body: Credentials):
 
     b64ciphertext, b64salt, b64nonce, b64tag = [base64.b64encode(i).decode() for i in (ciphertext, salt, nonce, tag)]
 
-    result = db.execute("INSERT INTO users (username, hash, dek, salt, nonce, tag) \
-                        VALUES \
-                        (%s, %s, %s, %s, %s, %s)", body.username, hashed, b64ciphertext, b64salt, b64nonce, b64tag)
-    
-    if isinstance(result, str):
+    try:
+        result = db.execute("INSERT INTO users (username, hash, dek, salt, nonce, tag) \
+                            VALUES \
+                            (%s, %s, %s, %s, %s, %s)", body.username, hashed, b64ciphertext, b64salt, b64nonce, b64tag)
+    except ConnectionError as e:
         response.status_code = 500
-        return {"msg": f"Database error: {result}"}
+        return {"msg": f"Database error: {e}"}
     
     return {"msg": "Success"}
 
 @app.post("/upload", status_code=201)
-async def upload(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)], body: File):
+async def upload(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)], dekDerivation: DekDerivation, file: File):
     db = request.app.state.db
 
     identity = decodeJWT(token)
@@ -130,14 +159,15 @@ async def upload(request: Request, response: Response, token: Annotated[str, Dep
     
     userID = identity["id"]
 
-    fileBytes = base64.b64decode(body.fileB64bytes)
+    fileBytes = base64.b64decode(file.b64bytes)
 
     compressed = compress(fileBytes)
 
-    b64encryptedDek, b64dekSalt, b64dekNonce, b64dekTag = db.execute("SELECT dek, salt, nonce, tag FROM users WHERE id = %s", userID)
-    encryptedDek, dekSalt, dekNonce, dekTag = [base64.b64decode(i) for i in (b64encryptedDek, b64dekSalt, b64dekNonce, b64dekTag)]
-
-    dek = decryptDEK(encryptedDek, body.passwd.encode(), dekSalt, dekNonce, dekTag)
+    try:
+        dek = getDEK(db, userID, dekDerivation.passwd.encode())
+    except ConnectionError as e:
+        response.status_code = 500
+        return {"msg": f"Database error: {e}"}
 
     nonce = get_random_bytes(24)
     cipher = ChaCha20_Poly1305.new(key=dek, nonce=nonce)
@@ -145,15 +175,62 @@ async def upload(request: Request, response: Response, token: Annotated[str, Dep
 
     b64ciphertext, b64nonce, b64tag = [base64.b64encode(i).decode() for i in (ciphertext, nonce, tag)]
 
-    fileNameLst = body.fileName.split(".")
+    fileNameLst = file.name.split(".")
     fileName = "".join(fileNameLst[:-1])
 
-    result = db.execute("INSERT INTO files (cipherText, nonce, tag, compressed, name, extension, userID) \
-                        VALUES \
-                        (%s, %s, %s, %s, %s, %s, %s)", b64ciphertext, b64nonce, b64tag, "t" if compressed["compressed"] else "f", fileName, fileNameLst[-1], userID)
-    
-    if isinstance(result, str):
+    try:
+        result = db.execute("INSERT INTO files (cipherText, nonce, tag, compressed, name, extension, userID) \
+                            VALUES \
+                            (%s, %s, %s, %s, %s, %s, %s)", b64ciphertext, b64nonce, b64tag, "t" if compressed["compressed"] else "f", fileName, fileNameLst[-1], userID)
+    except ConnectionError as e:
         response.status_code = 500
-        return {"msg": f"Database error: {result}"}
+        return {"msg": f"Database error: {e}"}
     
     return {"msg": "Success"}
+
+@app.post("/download", status_code=200)
+async def download(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)], dekDerivation: DekDerivation = Body(embed=True), fileID: FileID = Body(embed=True)):
+    db = request.app.state.db
+
+    identity = decodeJWT(token)
+
+    if not identity["success"]:
+        response.status_code = 401
+        return {"msg": "Invalid token"}
+    
+    userID = identity["id"]
+    fileID = fileID.id
+
+    try:
+        data = db.execute("SELECT cipherText, nonce, tag, compressed, name, extension \
+                    FROM files \
+                    WHERE userID = %s LIMIT %s,1", userID, fileID)
+    except ConnectionError as e:
+        response.status_code = 500
+        return {"msg": f"Database error: {e}"}
+
+    if not data:
+        response.status_code = 404
+        return {"msg": "Found no file on that fileID", "userID": userID, "fileID": fileID}
+    
+    try:
+        dek = getDEK(db, userID, dekDerivation.passwd.encode())
+    except ConnectionError as e:
+        response.status_code = 500
+        return {"msg": f"Database error: {e}"}
+    
+    b64ciphertext, b64nonce, b64tag, compressed, name, extension = data
+
+    ciphertext, nonce, tag = [base64.b64decode(i) for i in (b64ciphertext, b64nonce, b64tag)]
+
+    cipher = ChaCha20_Poly1305.new(key=dek, nonce=nonce)
+    compressedFile = cipher.decrypt_and_verify(ciphertext, tag)
+
+    if compressed == "t":
+        plaintext = decompress(compressedFile)
+    else:
+        plaintext = compressedFile
+
+    b64Plaintext = base64.b64encode(plaintext).decode()
+
+    return {"msg": "Success", "data": b64Plaintext, "name": name, "extension": extension}

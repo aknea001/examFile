@@ -36,7 +36,7 @@ class Database():
             
             connection.commit()
         except mysqlError as e:
-            return e
+            raise ConnectionError(e)
         finally:
             cursor.close()
             connection.close()
