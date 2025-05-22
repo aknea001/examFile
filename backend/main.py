@@ -235,6 +235,27 @@ async def download(request: Request, response: Response, token: Annotated[str, D
 
     return {"msg": "Success", "data": b64Plaintext, "name": name, "extension": extension}
 
+@app.delete("/delete", status_code=204)
+async def delete(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)], fileID: int = Query()):
+    db = request.app.state.db
+
+    identity = decodeJWT(token)
+
+    if not identity["success"]:
+        response.status_code = 401
+        return {"msg": "Invalid token"}
+    
+    userID = identity["id"]
+
+    try:
+        x = db.execute("SELECT id FROM files WHERE userID = %s LIMIT %s,1", userID, fileID)
+        db.execute("DELETE FROM files WHERE userID = %s AND id = %s", userID, x)
+    except ConnectionError as e:
+        response.status_code =  500
+        return {"msg": f"Database error: {e}"}
+    
+    return {"msg": "Success"}
+
 @app.get("/tableInfo", status_code=200)
 async def tableInfo(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)]):
     db = request.app.state.db

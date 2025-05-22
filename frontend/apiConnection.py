@@ -58,7 +58,14 @@ class APIc():
     def delete(self, fileID: int):
         # delete request, doesnt necessarily return anything
         # 204 = success
-        pass
+        with self.session as s:
+            res = s.delete(f"{self.baseUrl}/delete?fileID={fileID}")
+        
+        if res.status_code != 204:
+            print(res.json())
+            return {"success": False, "code": res.status_code, "msg": res.json()["msg"]}
+        
+        return {"success": True}
 
     def tableData(self) -> list:
         # get request, returns list of files user has uploaded

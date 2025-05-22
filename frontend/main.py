@@ -83,7 +83,7 @@ class Frontend(tk.Tk):
             tryRegister = self.api.register(username, passwd)
             if not tryRegister["success"]:
                 self.registerBtn.grid(row=4)
-                errorVar.set(f"{tryRegister['code']: tryRegister['msg']} \nTry again later..")
+                errorVar.set(f"{tryRegister['code']}: {tryRegister['msg']} \nTry again later..")
                 return
 
             self.switchPage("loginPage")
@@ -136,7 +136,7 @@ class Frontend(tk.Tk):
 
         label = tk.Label(row, text=fileName)
         btn = tk.Button(row, text="Download", width=12, command=lambda: self.download(fileID))
-        deleteBtn = tk.Button(row, text="Delete", width=12, command=lambda: self.api.delete(fileID))
+        deleteBtn = tk.Button(row, text="Delete", width=12, command=lambda: self.delete(fileID, fileName, row))
         
         label.grid(row=0, column=0, sticky="we")
         btn.grid(row=0, column=1, padx=(0, 2))
@@ -186,7 +186,7 @@ class Frontend(tk.Tk):
         result = self.api.download(fileID)
 
         if not result["success"]:
-            return #add error handling later
+            return # add error handling later
         
         data = result["data"]
         fullname = f"{data['name']}.{data['extension']}"
@@ -194,6 +194,18 @@ class Frontend(tk.Tk):
             f.write(base64.b64decode(data["data"]))
         
         messagebox.showinfo("Success", f"{fullname} successfully downloaded!")
+    
+    def delete(self, fileID: int, fileName: str, row):
+        confirm = messagebox.askokcancel("Are you sure?", f"Are you sure you want to delete {fileName} \nThis action is permanent")
+        if not confirm:
+            return
+        
+        result = self.api.delete(fileID)
+
+        if not result["success"]:
+            return # add error handling later
+        
+        row.destroy()
 
 def main():
     #apiBaseUrl = "chrome-extension://http://https:/api.api/api?api=api"
