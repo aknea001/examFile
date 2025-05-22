@@ -148,7 +148,7 @@ async def register(request: Request, response: Response, body: Credentials):
     return {"msg": "Success"}
 
 @app.post("/upload", status_code=201)
-async def upload(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)], dekDerivation: DekDerivation, file: File):
+async def upload(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)], dekDerivation: DekDerivation = Body(embed=True), file: File = Body(embed=True)):
     db = request.app.state.db
 
     identity = decodeJWT(token)
@@ -234,3 +234,33 @@ async def download(request: Request, response: Response, token: Annotated[str, D
     b64Plaintext = base64.b64encode(plaintext).decode()
 
     return {"msg": "Success", "data": b64Plaintext, "name": name, "extension": extension}
+
+@app.get("/tableInfo", status_code=200)
+async def tableInfo(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)]):
+    db = request.app.state.db
+
+    identity = decodeJWT(token)
+
+    if not identity["success"]:
+        response.status_code = 401
+        return {"msg": "Invalid token"}
+    
+    userID = identity["id"]
+
+    try:
+        data = db.execute("SELECT name, extension FROM files WHERE userID = %s", userID, a=2)
+    except ConnectionError as e:
+        response.status_code =  500
+        return {"msg": f"Database error: {e}"}
+    
+    parsedData = []
+
+    for entry in data:
+        dic = {
+            "fileName": entry[0],
+            "fileExtension": entry[1]
+        }
+
+        parsedData.append(dic)
+
+    return parsedData

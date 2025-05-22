@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import base64
 from apiConnection import APIc
 
@@ -144,6 +144,8 @@ class Frontend(tk.Tk):
 
         row.pack(fill="x", side="top", pady=(3, 0), padx=(0, 2))
 
+        self.latestFileID = fileID
+
     def getFile(self) -> str | None:
         filePath = filedialog.askopenfilename(title="Select file to upload")
         if not filePath:
@@ -169,7 +171,11 @@ class Frontend(tk.Tk):
 
         b64file = base64.b64encode(text).decode()
         
-        self.api.upload(b64file, filePath.split("/")[-1])
+        filename = filePath.split("/")[-1]
+        result = self.api.upload(b64file, filename)
+
+        if result["success"]:
+            self.addRow(filename, self.latestFileID + 1)
     
     def download(self, fileID: int):
         folderPath = self.getFoler()
@@ -183,8 +189,11 @@ class Frontend(tk.Tk):
             return #add error handling later
         
         data = result["data"]
-        with open(f"{folderPath}/{data['name']}.{data['extension']}", "wb") as f:
+        fullname = f"{data['name']}.{data['extension']}"
+        with open(f"{folderPath}/{fullname}", "wb") as f:
             f.write(base64.b64decode(data["data"]))
+        
+        messagebox.showinfo("Success", f"{fullname} successfully downloaded!")
 
 def main():
     #apiBaseUrl = "chrome-extension://http://https:/api.api/api?api=api"

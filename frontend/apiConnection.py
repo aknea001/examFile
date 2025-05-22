@@ -34,7 +34,7 @@ class APIc():
 
     def upload(self, b64file: str, fileName: str) -> dict:
         with self.session as s:
-            res = s.post(f"{self.baseUrl}/upload", json={"fileB64bytes": b64file, "fileName": fileName, "passwd": self.passwd})
+            res = s.post(f"{self.baseUrl}/upload", json={"file": {"b64bytes": b64file, "name": fileName}, "dekDerivation": {"passwd": self.passwd}})
         
         if res.status_code != 201:
             print(res.json())
@@ -49,6 +49,7 @@ class APIc():
             res = s.post(f"{self.baseUrl}/download", json={"dekDerivation": {"passwd": self.passwd}, "fileID": {"id": fileID}})
         
         if res.status_code != 200:
+            print(res.json())
             return {"success": False, "code": res.status_code, "msg": res.json()["msg"]}
         
         #return {"success": True, "data": res.json()["data"], "name": res.json()["name"], "extension": res.json()["extension"]}
@@ -62,8 +63,15 @@ class APIc():
     def tableData(self) -> list:
         # get request, returns list of files user has uploaded
         # f eks: [{"fileName": "contract", "fileExtension": "mp3"}, {"fileName": "essay", "fileExtension": "jpeg"}, {"fileName": "ytVid", "fileExtension": "pdf"}]
-        return [{"fileName": "contract", "fileExtension": "mp3"}, {"fileName": "essay", "fileExtension": "jpeg"}, {"fileName": "ytVid", "fileExtension": "pdf"}]
-    
+        with self.session as s:
+            res = s.get(f"{self.baseUrl}/tableInfo")
+        
+        if res.status_code != 200:
+            print(res.json())
+            return {"success": False, "code": res.status_code, "msg": res.json()["msg"]}
+        
+        return res.json()
+
 if __name__ == "__main__":
     api = APIc("http://localhost:8000")
     api.test()
