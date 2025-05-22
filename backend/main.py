@@ -22,14 +22,11 @@ def createJWT(data: str) -> str:
     encodedJWT = jwt.encode({"userID": data, "exp": datetime.now() + timedelta(hours=1)}, getenv("jwtSecret"), algorithm="HS256")
     return encodedJWT
 
-def decodeJWT(token: str) -> dict:
-    try:
-        payload = jwt.decode(token, getenv("jwtSecret"), algorithms=["HS256"], require=["exp"], verify_exp=True)
-        identity = payload.get("userID")
-    except jwt.exceptions.InvalidTokenError:
-        return {"success": False}
+def decodeJWT(token: str) -> int:
+    payload = jwt.decode(token, getenv("jwtSecret"), algorithms=["HS256"], require=["exp"], verify_exp=True)
+    identity = payload.get("userID")
     
-    return {"success": True, "id": int(identity)}
+    return int(identity)
 
 def getDEK(db, userID: int | str, passwd: bytes) -> bytes:
     try:
@@ -151,13 +148,11 @@ async def register(request: Request, response: Response, body: Credentials):
 async def upload(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)], dekDerivation: DekDerivation = Body(embed=True), file: File = Body(embed=True)):
     db = request.app.state.db
 
-    identity = decodeJWT(token)
-
-    if not identity["success"]:
+    try:
+        userID = decodeJWT(token)
+    except jwt.exceptions.InvalidTokenError:
         response.status_code = 401
         return {"msg": "Invalid token"}
-    
-    userID = identity["id"]
 
     fileBytes = base64.b64decode(file.b64bytes)
 
@@ -192,13 +187,12 @@ async def upload(request: Request, response: Response, token: Annotated[str, Dep
 async def download(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)], dekDerivation: DekDerivation = Body(embed=True), fileID: FileID = Body(embed=True)):
     db = request.app.state.db
 
-    identity = decodeJWT(token)
-
-    if not identity["success"]:
+    try:
+        userID = decodeJWT(token)
+    except jwt.exceptions.InvalidTokenError:
         response.status_code = 401
         return {"msg": "Invalid token"}
     
-    userID = identity["id"]
     fileID = fileID.id
 
     try:
@@ -239,13 +233,11 @@ async def download(request: Request, response: Response, token: Annotated[str, D
 async def delete(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)], fileID: int = Query()):
     db = request.app.state.db
 
-    identity = decodeJWT(token)
-
-    if not identity["success"]:
+    try:
+        userID = decodeJWT(token)
+    except jwt.exceptions.InvalidTokenError:
         response.status_code = 401
         return {"msg": "Invalid token"}
-    
-    userID = identity["id"]
 
     try:
         x = db.execute("SELECT id FROM files WHERE userID = %s LIMIT %s,1", userID, fileID)[0]
@@ -260,13 +252,11 @@ async def delete(request: Request, response: Response, token: Annotated[str, Dep
 async def tableInfo(request: Request, response: Response, token: Annotated[str, Depends(oauth2Scheme)]):
     db = request.app.state.db
 
-    identity = decodeJWT(token)
-
-    if not identity["success"]:
+    try:
+        userID = decodeJWT(token)
+    except jwt.exceptions.InvalidTokenError:
         response.status_code = 401
         return {"msg": "Invalid token"}
-    
-    userID = identity["id"]
 
     try:
         data = db.execute("SELECT name, extension FROM files WHERE userID = %s", userID, a=2)
