@@ -16,11 +16,11 @@ def sync(api) -> list:
 def main():
     signal(SIGTERM, shutdown)
 
-    api = APIc("http://10.0.0.20:8000")
+    api = APIc("http://100.116.95.27:8000")
     while running:
         sync(api)
 
-        for i in range(60):
+        for i in range(10):
             if not running:
                 break
 

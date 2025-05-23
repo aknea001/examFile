@@ -38,7 +38,7 @@ class Frontend(tk.Tk):
                 try:
                     process = psutil.Process(int(data["syncingpid"]))
 
-                    if process.name() == "python.exe":
+                    if process.name() == "python":
                         running = True
                     else:
                         running = False
@@ -122,10 +122,11 @@ class Frontend(tk.Tk):
         self.api.token = None
         self.api.passwd = None
 
+        if self.syncing == "t":
+            self.stopSyncing([])
+
         if isfile(self.infoFile):
             remove(self.infoFile)
-
-        self.stopSyncing([])
 
         self.switchPage("loginPage")
 
@@ -194,7 +195,9 @@ class Frontend(tk.Tk):
             self.syncingMenu.add_command(label="Test3")
 
         if not entries:
-            tk.Label(self, text="Click Upload to upload a file").pack()
+            self.uploadLabel = tk.Label(self, text="Click Upload to upload a file")
+            self.uploadLabel.pack()
+            self.latestFileID = -1
         else:
             count = 0
             for i in entries:
@@ -252,6 +255,8 @@ class Frontend(tk.Tk):
 
         if result["success"]:
             self.addRow(filename, self.latestFileID + 1)
+            if self.latestFileID == 0:
+                self.uploadLabel.destroy()
     
     def download(self, fileID: int):
         folderPath = self.getFolder("Select folder to download file in")
@@ -361,7 +366,7 @@ class Frontend(tk.Tk):
 
 def main():
     #apiBaseUrl = "chrome-extension://http://https:/api.api/api?api=api"
-    apiBaseUrl = "http://100.94.183.127:8000"
+    apiBaseUrl = "http://100.116.95.27:8000"
 
     app = Frontend(apiBaseUrl)
     app.mainloop()
