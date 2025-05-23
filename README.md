@@ -34,10 +34,18 @@ deactivate
 ```
   
   
-* For å starte appen skriv
+* For å starte appen skriv  
+Mac:
 ```
+source .venv/bin/activate
 cd frontend
-python3 main.py
+python main.py
+```
+Windows:
+```
+.\.venv\Scripts\activate
+cd frontend
+python main.py
 ```
 ---
 ## Hvordan bruke exam file
