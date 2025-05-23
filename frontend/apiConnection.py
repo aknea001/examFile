@@ -1,10 +1,10 @@
 import requests
 
 class APIc():
-    def __init__(self, url: str):
+    def __init__(self, url: str, passwd:str = None, token: str = None):
         self.baseUrl = url
-        self.passwd = None
-        self.token = None
+        self.passwd = passwd
+        self.token = token
         self.headers = {"Authorization": f"Bearer {self.token}"}
 
         self.session = requests.Session()

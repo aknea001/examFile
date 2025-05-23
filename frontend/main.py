@@ -360,13 +360,13 @@ class Frontend(tk.Tk):
         self.switchPage("homePage", entries)
     
     def manualSync(self):
-        newEntries = sync(self.api)
+        newEntries = sync(self.api, self.syncingFolder)
 
         self.switchPage("homePage", newEntries)
 
 def main():
     #apiBaseUrl = "chrome-extension://http://https:/api.api/api?api=api"
-    apiBaseUrl = "http://100.116.95.27:8000"
+    apiBaseUrl = "https://examfile.keali.org"
 
     app = Frontend(apiBaseUrl)
     app.mainloop()
